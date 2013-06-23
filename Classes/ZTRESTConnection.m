@@ -139,8 +139,10 @@
   //If credentials are provided use them, but only over ssl
   if (self.username && self.password)
   {
-    NSString* authenticationString = [[NSString stringWithFormat:@"%@:%@", self.username, self.password] base64EncodeString];
-    [URLRequest addValue:authenticationString forHTTPHeaderField:@"Authentication"];
+      NSString* authString = [[NSString stringWithFormat:@"%@:%@", self.username, self.password] base64EncodeString];
+      NSString *authValue = [NSString stringWithFormat:@"Basic %@", authString];
+      NSLog(@"Auth %@", authValue);
+      [URLRequest addValue:authValue forHTTPHeaderField:@"Authorization"];
   }
   
   if ([action isEqualToString:@"POST"] || [action isEqualToString:@"PUT"])
@@ -218,7 +220,7 @@
   
   #if DEBUG
   
-  //NSLog(@"%s:\n%@",__PRETTY_FUNCTION__,request);
+  NSLog(@"%s:\n%@",__PRETTY_FUNCTION__,request);
   
   #endif
 
@@ -231,6 +233,10 @@
     [NSURLConnection sendAsynchronousRequest:request queue:[NSOperationQueue mainQueue] completionHandler:^(NSURLResponse* URLResponse, NSData* URLRequestData, NSError* URLRequestError){
 
       //NSLog(@"%@",[[NSString alloc] initWithBytes:[URLRequestData bytes] length:[URLRequestData length] encoding:NSUTF8StringEncoding]);
+        
+        if (URLRequestError) {
+            NSLog(@"%s:\n%@",__PRETTY_FUNCTION__,URLRequestError);
+        }
         
         //Immediately try redirect
         if (((NSHTTPURLResponse*)URLResponse).statusCode == 302) {
