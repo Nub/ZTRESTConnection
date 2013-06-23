@@ -7,7 +7,7 @@
 //
 
 #import "ZTRESTConnection.h"
-#import "NSString+Additions.h"
+#import "NSString+ZTRESTAdditions"
 
 @interface ZTRESTConnection () <NSURLConnectionDelegate>
 

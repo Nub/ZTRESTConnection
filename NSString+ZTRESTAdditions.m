@@ -8,8 +8,8 @@
 
 #import <CommonCrypto/CommonDigest.h>
 
-#import "NSData+Additions.h"
-#import "NSString+Additions.h"
+#import "NSData+ZTRESTAdditions.h"
+#import "NSString+ZTRESTAdditions.h"
 
 @implementation NSString (Additions)
 
