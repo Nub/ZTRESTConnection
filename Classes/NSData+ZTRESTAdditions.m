@@ -6,7 +6,7 @@
 //  Copyright (c) 2012 Zachry Thayer. All rights reserved.
 //
 
-#import "NSData+Additions.h"
+#import "NSData+ZTRESTAdditions.h"
 
 @implementation NSData (Additions)
 
