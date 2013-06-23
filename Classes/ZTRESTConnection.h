@@ -8,9 +8,6 @@
 
 #import <Foundation/Foundation.h>
 
-//Uncomment for iOS4 support (expiremental)
-//#define ZTRESTUseURLConnectionDelegate 1
-
 typedef void (^ZTRESTCompletion)(NSHTTPURLResponse* response, id object, NSError* error);
 
 // Returns and object for specified mimetype
@@ -20,7 +17,9 @@ typedef id (^ZTRESTMimeHandler)(NSHTTPURLResponse* response, NSData* data);
 @interface ZTRESTConnection : NSObject
 
 @property (strong, nonatomic) NSURL* apiBase;
-@property (nonatomic, readonly) BOOL usesSSL;
+
+@property (strong, nonatomic) NSString* username;
+@property (strong, nonatomic) NSString* password;
 
 @property (nonatomic, strong) NSHTTPURLResponse* lastResponse;
 @property (nonatomic, strong) NSError*           lastError;
@@ -58,6 +57,10 @@ typedef id (^ZTRESTMimeHandler)(NSHTTPURLResponse* response, NSData* data);
 - (id)DELETE:(NSString*)route;
 
 #pragma mark Helpers
+
+- (NSMutableURLRequest*)requestForAction:(NSString*)action route:(NSString*)route data:(id)data;
+- (void)performAsyncRequest:(NSMutableURLRequest*)request completion:(ZTRESTCompletion)completionBlock;
+- (id)performRequest:(NSMutableURLRequest*)request;
 
 // For use when POSTing queries
 + (NSData*)queryDataFromDictionary:(NSDictionary*)dictionary;

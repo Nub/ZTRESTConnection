@@ -9,43 +9,15 @@
 #import "ZTRESTConnection.h"
 #import "NSString+ZTRESTAdditions.h"
 
-@interface ZTRESTConnection () <NSURLConnectionDelegate>
+@interface ZTRESTConnection () <NSURLConnectionDelegate> {
+    BOOL _usesSSL;
+}
 
 @property (strong, nonatomic) NSMutableDictionary* mimeTypeHandlers;
-
-#ifdef ZTRESTUseURLConnectionDelegate
-@property (strong, nonatomic) NSMutableDictionary* connections;
-#else
-@property dispatch_queue_t networkQueue;
-#endif
-
-//Authentication
-@property (nonatomic, readwrite) BOOL usesSSL;
-@property (strong, nonatomic) NSString* username;
-@property (strong, nonatomic) NSString* password;
-
-- (void)performAsyncRequest:(NSURLRequest*)request completion:(ZTRESTCompletion)completionBlock;
-- (void)installDefaultMimeTypeHandlers;
-+ (NSString*)queryStringFromDictionary:(NSDictionary*)dictionary;
 
 @end
 
 @implementation ZTRESTConnection
-
-@synthesize mimeTypeHandlers;
-
-#ifdef ZTRESTUseURLConnectionDelegate
-@synthesize connections;
-#else
-@synthesize networkQueue;
-#endif
-
-@synthesize usesSSL;
-@synthesize username;
-@synthesize password;
-
-@synthesize apiBase;
-
 
 + (ZTRESTConnection*)connectionToApi:(NSString*)api
 {
@@ -77,14 +49,8 @@
   {
     self.username = aUsername;
     self.password = aPassword;
-    self.usesSSL = YES;
   }
   return self;
-}
-
-- (void)dealloc
-{
-  //dispatch_release(self.networkQueue);
 }
 
 #pragma mark - Public
@@ -158,10 +124,12 @@
   {
     if (data)
     {
-      NSDictionary* queryParams = data;
-      NSString* queryString = [ZTRESTConnection queryStringFromDictionary:queryParams];
-      fullRoute = [[requestURL absoluteString] stringByAppendingFormat:@"?%@", queryString];
-      requestURL = [NSURL URLWithString:fullRoute];
+        if ([data isKindOfClass:[NSDictionary class]]) {
+            NSDictionary* queryParams = data;
+            NSString* queryString = [ZTRESTConnection queryStringFromDictionary:queryParams];
+            fullRoute = [[requestURL absoluteString] stringByAppendingFormat:@"?%@", queryString];
+            requestURL = [NSURL URLWithString:fullRoute];
+        }
     }
   }
   
@@ -169,16 +137,22 @@
   [URLRequest setHTTPMethod:action];
   
   //If credentials are provided use them, but only over ssl
-  if (self.usesSSL && self.username && self.password)
+  if (self.username && self.password)
   {
-    
     NSString* authenticationString = [[NSString stringWithFormat:@"%@:%@", self.username, self.password] base64EncodeString];
     [URLRequest addValue:authenticationString forHTTPHeaderField:@"Authentication"];
   }
   
   if ([action isEqualToString:@"POST"] || [action isEqualToString:@"PUT"])
   {
-    [URLRequest setHTTPBody:data];
+      if ([data isKindOfClass:[NSDictionary class]]) {
+          NSData* json = [NSJSONSerialization dataWithJSONObject:data options:0 error:nil];
+          [URLRequest setHTTPBody:json];
+          [URLRequest setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+      }
+      else {
+        [URLRequest setHTTPBody:data];
+      }
   }
   
   return URLRequest;
@@ -204,44 +178,22 @@
 {
   if ([[anApiBase scheme] isEqualToString:@"https"])
   {
-    usesSSL = YES;
+    _usesSSL = YES;
   }
   
-  apiBase = anApiBase;
-  
-#ifndef ZTRESTUseURLConnectionDelegate
-  NSString* networkQueueName = [NSString stringWithFormat:@"com.zachrythayer.ztkit.rest_connection.%@", [apiBase host]];
-  
-  if (self.networkQueue)
-  {
-    //dispatch_release(self.networkQueue);
-  }
-  self.networkQueue = dispatch_queue_create([networkQueueName UTF8String], NULL);
-#endif
+  _apiBase = anApiBase;
 }
 
-- (void)setUseSSL:(BOOL)ssl
-{
-  if (!apiBase)
-  {
-    return;
-  }
-  
-  usesSSL = ssl;
-  
-  //TODO:make route use SSL
-  
-}
 
 #pragma mark Getters
 
 - (NSMutableDictionary*)mimeTypeHandlers
 {
-  if (!mimeTypeHandlers)
+  if (!_mimeTypeHandlers)
   {
-    mimeTypeHandlers = [NSMutableDictionary dictionary];
+    _mimeTypeHandlers = [NSMutableDictionary dictionary];
   }
-  return mimeTypeHandlers;
+  return _mimeTypeHandlers;
 }
 
 #ifdef ZTRESTUseURLConnectionDelegate
@@ -259,7 +211,7 @@
 
 #pragma mark Helpers
 
-- (void)performAsyncRequest:(NSURLRequest*)request completion:(ZTRESTCompletion)completionBlock 
+- (void)performAsyncRequest:(NSMutableURLRequest*)request completion:(ZTRESTCompletion)completionBlock
 {
   
   NSAssert([NSURLConnection canHandleRequest:request],@"Can't handle request %@\n%s", request, __PRETTY_FUNCTION__);
@@ -270,48 +222,70 @@
   
   #endif
 
-#ifdef ZTRESTUseURLConnectionDelegate
-  // Delegate based connection
-    NSURLConnection *aConnection = [NSURLConnection connectionWithRequest:request delegate:self];    
-    
-    NSMutableDictionary *connectionDict = [NSMutableDictionary dictionary];
-    [connectionDict setObject:aConnection forKey:@"connection"];
-    [connectionDict setObject:request forKey:@"request"];
-    [connectionDict setObject:[NSMutableData data] forKey:@"data"];
-    [connectionDict setObject:[completionBlock copy] forKey:@"completion"];
-    
-    [self.connections setObject:connectionDict forKey:[ZTRESTConnection keyForConnection:aConnection]];
-
-#else
-  // Synchronous in background thread connection
-  dispatch_async(self.networkQueue, ^(){
+  
     NSHTTPURLResponse* URLResponse;
     NSError* URLRequestError;
-    
+
     NSData* URLRequestData = [NSURLConnection sendSynchronousRequest:request returningResponse:&URLResponse error:&URLRequestError];
     
-    //NSLog(@"%@",[[NSString alloc] initWithBytes:[URLRequestData bytes] length:[URLRequestData length] encoding:NSUTF8StringEncoding]);
-    
-    id object = [self objectFormMimeTypeWithResponse:URLResponse withData:URLRequestData];
-    
-    completionBlock(URLResponse, object, URLRequestError);
-  });
-#endif
+    [NSURLConnection sendAsynchronousRequest:request queue:[NSOperationQueue mainQueue] completionHandler:^(NSURLResponse* URLResponse, NSData* URLRequestData, NSError* URLRequestError){
+
+      //NSLog(@"%@",[[NSString alloc] initWithBytes:[URLRequestData bytes] length:[URLRequestData length] encoding:NSUTF8StringEncoding]);
+        
+        //Immediately try redirect
+        if (((NSHTTPURLResponse*)URLResponse).statusCode == 302) {
+            
+            NSString* responseLocation = [((NSHTTPURLResponse*)URLResponse) allHeaderFields][@"Location"];
+            NSURL* redirectURL = [NSURL URLWithString:responseLocation];
+            
+            [request setURL:redirectURL];
+            
+            [self performAsyncRequest:request completion:completionBlock];
+            
+            return;
+        }
+        
+        id object = nil;
+        
+        if (((NSHTTPURLResponse*)URLResponse).statusCode == 200) {
+            object = [self objectFormMimeTypeWithResponse:(NSHTTPURLResponse*)URLResponse withData:URLRequestData];
+        }
+        
+        completionBlock((NSHTTPURLResponse*)URLResponse, object, URLRequestError);
+        
+        self.lastResponse = (NSHTTPURLResponse*)URLResponse;
+        self.lastError    = URLRequestError;
+        
+    }];
 }
 
-- (id)performRequest:(NSURLRequest*)request
+- (id)performRequest:(NSMutableURLRequest*)request
 {
-  NSHTTPURLResponse* response;
-  NSError* error;
+    NSHTTPURLResponse* response;
+    NSError* error;
+
+    NSData* URLRequestData = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
+
+    if (response.statusCode == 302) {
+
+        NSString* responseLocation = [response allHeaderFields][@"Location"];
+        NSURL* redirectURL = [NSURL URLWithString:responseLocation];
+
+        [request setURL:redirectURL];
+
+        return [self performRequest:request];
+    }
+
+    id object = nil;
+
+    if (response.statusCode == 200) {
+        object = [self objectFormMimeTypeWithResponse:response withData:URLRequestData];
+    }
   
-  NSData* URLRequestData = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
-  
-  id object = [self objectFormMimeTypeWithResponse:response withData:URLRequestData];
-  
-  self.lastResponse = response;
-  self.lastError    = error;
-  
-  return object;
+    self.lastResponse = response;
+    self.lastError    = error;
+
+    return object;
 }
 
 + (NSString*)keyForConnection:(NSURLConnection*)connection
@@ -492,63 +466,5 @@
   [self.mimeTypeHandlers setObject:[textHandler copy] forKey:@"text/html"];
   
 }
-
-
-#ifdef ZTRESTUseURLConnectionDelegate
-
-#pragma mark NSURLConnectionDelegate
-
-- (void)connection:(NSURLConnection *)connection didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge
-{
-  if ([challenge previousFailureCount] == 0 && self.username && self.password)
-  {
-    
-    NSURLCredential *newCredential = [NSURLCredential credentialWithUser:self.username
-                                                                password:self.password
-                                                             persistence:NSURLCredentialPersistenceForSession];
-    [[challenge sender] useCredential:newCredential forAuthenticationChallenge:challenge];
-  }
-}
-
-- (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
-{
-  NSString* key = [ZTRESTConnection keyForConnection:connection];
-  NSMutableDictionary* connectionDict = [self.connections objectForKey:key];
-  [connectionDict setObject:response forKey:@"response"];
-}
-
-- (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
-{
-  NSString* key = [ZTRESTConnection keyForConnection:connection];
-  NSMutableDictionary* connectionDict = [self.connections objectForKey:key];
-  NSMutableData* connectionData = [connectionDict objectForKey:@"data"];
-  [connectionData appendData:data];
-}
-
-- (void)connectionDidFinishLoading:(NSURLConnection *)connection
-{
-  NSString* key = [ZTRESTConnection keyForConnection:connection];
-  NSMutableDictionary* connectionDict = [self.connections objectForKey:key];
-  ZTRESTCompletion completionBlock = [connectionDict objectForKey:@"completion"];
-  NSHTTPURLResponse* response = [connectionDict objectForKey:@"response"];
-  NSMutableData* data = [connectionDict objectForKey:@"data"];
-    
-  completionBlock(response, [NSData dataWithData:data], nil);
-  [self.connections removeObjectForKey:key]; //Clear out cache
-}
-
-- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
-{
-  
-  NSString* key = [ZTRESTConnection keyForConnection:connection];
-  NSMutableDictionary* connectionDict = [self.connections objectForKey:key];
-  ZTRESTCompletion completionBlock = [connectionDict objectForKey:@"completion"];
-  NSHTTPURLResponse* response = [connectionDict objectForKey:@"response"];
-  
-  completionBlock(response, nil, error);
-  [self.connections removeObjectForKey:key]; // Clear out cache
-}
-
-#endif
 
 @end
