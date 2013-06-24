@@ -19,22 +19,22 @@
 #pragma mark - Gzip
 
 /*
-- (NSData *)gzipDeflate;
-- (NSData *)gzipInflate;
-
-
-#pragma mark - TBXML
-
-+ (NSData *)dataWithUncompressedContentsOfFile:(NSString *)file;
-
-*/
+ - (NSData *)gzipDeflate;
+ - (NSData *)gzipInflate;
+ 
+ 
+ #pragma mark - TBXML
+ 
+ + (NSData *)dataWithUncompressedContentsOfFile:(NSString *)file;
+ 
+ */
 #pragma mark - Miscellaneous
 
 //- (NSString *)hexString;
 
-- (NSString*)base64;
-- (NSString*)NSString;
+- (NSString *)base64;
+- (NSString *)NSString;
 
-+ (NSData*)dataWithString:(NSString*)aString;
++ (NSData *)dataWithString:(NSString *)aString;
 
 @end
