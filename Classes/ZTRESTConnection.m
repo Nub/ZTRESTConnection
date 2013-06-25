@@ -179,7 +179,7 @@
 #pragma mark Helpers
 
 - (void)performAsyncRequest:(NSMutableURLRequest *)request completion:(ZTRESTCompletion)completionBlock {
-    NSAssert([NSURLConnection canHandleRequest:request], @"Can't handle request %@\n%s", request, __PRETTY_FUNCTION__);
+//    NSAssert([NSURLConnection canHandleRequest:request], @"Can't handle request %@\n%s", request, __PRETTY_FUNCTION__);
     
 #if DEBUG
     
@@ -190,9 +190,7 @@
     
     NSHTTPURLResponse *URLResponse;
     NSError *URLRequestError;
-    
-    NSData *URLRequestData = [NSURLConnection sendSynchronousRequest:request returningResponse:&URLResponse error:&URLRequestError];
-    
+        
     [NSURLConnection sendAsynchronousRequest:request queue:[NSOperationQueue mainQueue] completionHandler:^(NSURLResponse *URLResponse, NSData *URLRequestData, NSError *URLRequestError) {
         //NSLog(@"%@",[[NSString alloc] initWithBytes:[URLRequestData bytes] length:[URLRequestData length] encoding:NSUTF8StringEncoding]);
         
