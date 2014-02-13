@@ -212,9 +212,9 @@
         
         id object = nil;
         
-        if (((NSHTTPURLResponse *)URLResponse).statusCode == 200) {
-            object = [self objectFormMimeTypeWithResponse:(NSHTTPURLResponse *)URLResponse withData:URLRequestData];
-        }
+		if (URLRequestData.length) {
+			object = [self objectFormMimeTypeWithResponse:(NSHTTPURLResponse *)URLResponse withData:URLRequestData];
+		}
         
         completionBlock((NSHTTPURLResponse *)URLResponse, object, URLRequestError);
         
