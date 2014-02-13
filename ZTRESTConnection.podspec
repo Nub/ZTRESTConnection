@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name         = "ZTRESTConnection"
-  s.version      = "0.0.3"
+  s.version      = "0.0.4"
   s.summary      = "A lightweight block based REST library for OBJ-C."
   s.homepage     = "https://github.com/Nub/ZTRESTConnection"
   s.license      = 'MIT'
