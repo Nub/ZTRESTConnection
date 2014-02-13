@@ -338,10 +338,6 @@
 }
 
 - (id)objectFormMimeTypeWithResponse:(NSHTTPURLResponse *)response withData:(NSData *)data {
-    if ((NSInteger)(response.statusCode / 100) != 2) { //Is of type 200
-        return nil;
-    }
-    
     ZTRESTMimeHandler mimeHandler = [self.mimeTypeHandlers objectForKey:response.MIMEType];
     
     if (!mimeHandler) {
